@@ -1,0 +1,79 @@
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#include <iostream>
+#include <string>
+#include <vector>
+
+#include "potato.h"
+
+class player {
+ public:
+  int num_player;
+  int ringmaster_fd;
+  int client_fd;
+  int server_fd;
+  int player_id;
+  player() : num_player(0), ringmaster_fd(-1), player_id(-1) {}
+
+  void ringmaster_connect(char ** argv) {
+    int status;
+    struct addrinfo host_info;
+    struct addrinfo * host_info_list;
+    const char * hostname;
+    const char * port;
+    hostname = argv[1];
+    port = argv[2];
+    //getaddress_info
+    memset(&host_info, 0, sizeof(host_info));
+
+    host_info.ai_family = AF_UNSPEC;
+    host_info.ai_socktype = SOCK_STREAM;
+    host_info.ai_flags = AI_PASSIVE;
+
+    status = getaddrinfo(hostname, port, &host_info, &host_info_list);
+    if (status != 0) {
+      std::cerr << "Error: cannot get address info for host" << std::endl;
+      std::cerr << "  (" << hostname << "," << port << ")" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+
+    //get the socket of ringmaster
+
+    ringmaster_fd = socket(host_info_list->ai_family,
+                           host_info_list->ai_socktype,
+                           host_info_list->ai_protocol);
+    if (ringmaster_fd == -1) {
+      std::cerr << "Error: cannot create socket" << std::endl;
+      std::cerr << "  (" << hostname << "," << port << ")" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+
+    //connect to ringmaster
+    status = connect(ringmaster_fd, host_info_list->ai_addr, host_info_list->ai_addrlen);
+    if (status == -1) {
+      std::cerr << "Error: cannot connect to socket" << std::endl;
+      std::cerr << "  (" << hostname << "," << port << ")" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+
+    //recieve player id
+    recv(ringmaster_fd, &player_id, sizeof(player_id), 0);
+    printf("recieved player id:%d\n", player_id);
+    //recieve player numbers
+    recv(ringmaster_fd, &num_player, sizeof(num_player), 0);
+    printf("recieved player number:%d\n", num_player);
+  }
+};
+
+int main(int argc, char ** argv) {
+  player * myplayer = new player();
+  myplayer->ringmaster_connect(argv);
+  delete myplayer;
+  return EXIT_SUCCESS;
+}
